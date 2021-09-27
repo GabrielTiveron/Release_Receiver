@@ -7,4 +7,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: echo ${{ github.event.client_payload.repo_name }}
+      - run: 'which ssh-agent || ( apt-get update -qy && apt-get install openssh-client -qqy )'
+      - run: eval `ssh-agent -s`
+      - run: echo "${SSH_PRIVATE_KEY}" | tr -d '\r' | ssh-add - > /dev/null 
+      - run: mkdir -p ~/.ssh
+      - run: chmod 700 ~/.ssh
+      - run: echo "$SSH_PUBLIC_KEY" >> ~/.ssh/id_rsa.pub
+      - run: '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+      - run: pip3 install requests && python3 metrics_consumer.py github.event.client_payload.repo_name
+      - run: git config --global user.email "${CI_EMAIL}"
+      - run: git config --global user.name "${CI_USERNAME}"
+      - run: git add .
+      - run: git commit -m "Generating sonarcloud metrics"
+      - run: git push
+      - run: echo "Compile complete."
